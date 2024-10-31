@@ -35,9 +35,11 @@ func main() {
 	go func() {
 		for {
 			var msg Message
-			if err := json.NewDecoder(conn).Decode(&msg); err == nil {
-				fmt.Printf("received message on topic '%s' from %s: %s\n", msg.Topic, msg.Sender, msg.Content)
+			if err := json.NewDecoder(conn).Decode(&msg); err != nil {
+				fmt.Println("error decoding message:", err)
+				continue
 			}
+			fmt.Printf("[%s] %s: %s\n", msg.Topic, msg.Sender, msg.Content)
 		}
 	}()
 

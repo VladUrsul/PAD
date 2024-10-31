@@ -14,20 +14,31 @@ type Message struct {
 }
 
 type Broker struct {
-	subscribers map[string][]net.Conn
-	mu          sync.Mutex
+	subscribers  map[string][]net.Conn
+	messageStore map[string][]Message
+	mu           sync.Mutex
 }
 
 func NewBroker() *Broker {
 	return &Broker{
-		subscribers: make(map[string][]net.Conn),
+		subscribers:  make(map[string][]net.Conn),
+		messageStore: make(map[string][]Message),
 	}
 }
 
 func (b *Broker) Subscribe(topic string, conn net.Conn) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
 	b.subscribers[topic] = append(b.subscribers[topic], conn)
+
+	if messages, ok := b.messageStore[topic]; ok {
+		for _, msg := range messages {
+			if err := json.NewEncoder(conn).Encode(msg); err != nil {
+				fmt.Println("error sending stored message:", err)
+			}
+		}
+	}
 }
 
 func (b *Broker) Unsubscribe(topic string, conn net.Conn) {
@@ -45,6 +56,9 @@ func (b *Broker) Unsubscribe(topic string, conn net.Conn) {
 func (b *Broker) Publish(msg Message) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	b.messageStore[msg.Topic] = append(b.messageStore[msg.Topic], msg)
+
 	conns, ok := b.subscribers[msg.Topic]
 	if ok {
 		for _, conn := range conns {
